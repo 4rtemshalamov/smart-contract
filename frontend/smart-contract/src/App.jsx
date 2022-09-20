@@ -12,7 +12,7 @@ const App = () => {
   const [success, setSuccess] = useState(false)
   const [count, setCount] = useState()
   const [message, setMessage] = useState()
-  const contractAddress = '0x2288df0C77019FBD0b7b1e84F2714416995cE21a'
+  const contractAddress = '0x0dEA802C45Bf798c3fbd93447E6225C21E74332b'
 
   const contractABI = abi.abi
 
@@ -77,7 +77,9 @@ const App = () => {
         let count = await wavePortalContract.getTotalWaves()
         console.log('Retrieved total wave count...', count.toNumber())
 
-        const waveTxn = await wavePortalContract.wave(message)
+        const waveTxn = await wavePortalContract.wave(message, {
+          gasLimit: 300000,
+        })
         if (Boolean(waveTxn)) {
           setLoader(true)
         }
@@ -113,15 +115,8 @@ const App = () => {
           signer
         )
 
-        /*
-         * Call the getAllWaves method from your Smart Contract
-         */
         const waves = await wavePortalContract.getAllWaves()
 
-        /*
-         * We only need address, timestamp, and message in our UI so let's
-         * pick those out
-         */
         let wavesCleaned = []
         waves.forEach((wave) => {
           wavesCleaned.push({
@@ -144,22 +139,59 @@ const App = () => {
     checkIfWalletIsConnected()
   }, [])
 
+  useEffect(() => {
+    let wavePortalContract
+
+    const onNewWave = (from, timestamp, message) => {
+      console.log('NewWave', from, timestamp, message)
+      setAllWaves((prevState) => [
+        ...prevState,
+        {
+          address: from,
+          timestamp: new Date(timestamp * 1000),
+          message: message,
+        },
+      ])
+    }
+
+    if (window.ethereum) {
+      const provider = new ethers.providers.Web3Provider(window.ethereum)
+      const signer = provider.getSigner()
+
+      wavePortalContract = new ethers.Contract(
+        contractAddress,
+        contractABI,
+        signer
+      )
+      wavePortalContract.on('NewWave', onNewWave)
+    }
+
+    return () => {
+      if (wavePortalContract) {
+        wavePortalContract.off('NewWave', onNewWave)
+      }
+    }
+  }, [])
+
   return (
     <div>
       <div className="mainContainer">
         <div className="dataContainer">
           <div>
             <div className="header">👋 Hey there!</div>
-            <div className="bio">It`s my first web3 project!`</div>
-            <div>Retrieved total wave count...{count?.toNumber()}</div>
+            <div className="bio">It`s my first web3 project!</div>
+            <div>
+              <span>Retrieved total wave count...</span>
+              <span>{Boolean(count) && count.toNumber()}</span>
+            </div>
             <TextField
               id="standard-basic"
               label="Standard"
-              color="success"
+              color="primary"
               backgroundColor="white"
               onChange={(e) => setMessage(e.target.value)}
             />
-            {message && <div>{message}</div>}
+            {/* {message && <div>{message}</div>} */}
 
             {!currentAccount && (
               <button className="waveButton" onClick={connectWallet}>
